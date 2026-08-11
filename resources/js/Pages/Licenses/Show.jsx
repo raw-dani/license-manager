@@ -57,6 +57,12 @@ export default function ShowLicense({ license }) {
         router.get(`/admin/licenses/${license.id}/edit`);
     };
 
+    const revokeActivation = (activationId) => {
+        if (confirm('Revoke this device activation? This will free up one activation slot.')) {
+            router.delete(`/admin/licenses/${license.id}/activations/${activationId}`);
+        }
+    };
+
     return (
         <Layout>
             <div className="flex items-center justify-between mb-6">
@@ -177,6 +183,14 @@ export default function ShowLicense({ license }) {
                                 <p className="text-xs text-gray-400 mt-1">
                                     Last verified: {activation.last_verified_at ? new Date(activation.last_verified_at).toLocaleString() : 'Never'}
                                 </p>
+                                <div className="mt-3 pt-3 border-t border-gray-100 flex justify-end">
+                                    <button
+                                        onClick={() => revokeActivation(activation.id)}
+                                        className="text-xs text-red-600 hover:text-red-900"
+                                    >
+                                        Revoke Activation
+                                    </button>
+                                </div>
                             </div>
                         ))}
                         {license.activations.length === 0 && (

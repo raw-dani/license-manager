@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\ActivationLog;
 use App\Models\License;
+use App\Models\LicenseActivation;
 use App\Models\Product;
 use App\Notifications\LicenseStatusChanged;
 use App\Services\License\LicenseKeyGenerator;
@@ -184,6 +185,26 @@ class LicenseController extends Controller
 
         return redirect()->route('admin.licenses.index')
             ->with('success', 'License deleted.');
+    }
+
+    public function destroyActivation(License $license, LicenseActivation $activation): RedirectResponse
+    {
+        if ($activation->license_id !== $license->id) {
+            return back()->with('error', 'Activation does not belong to this license.');
+        }
+
+        $activation->delete();
+
+        $license->decrement('current_activations');
+
+        ActivationLog::create([
+            'license_id' => $license->id,
+            'license_key' => $license->license_key,
+            'action' => 'deactivate',
+            'notes' => 'Device activation revoked by admin',
+        ]);
+
+        return back()->with('success', 'Device activation revoked successfully.');
     }
 
     public function generateKey(): JsonResponse

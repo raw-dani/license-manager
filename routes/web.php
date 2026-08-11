@@ -31,6 +31,7 @@ Route::middleware(['auth', 'role.or:admin,super-admin'])->prefix('admin')->name(
     Route::post('licenses/{license}/activate', [LicenseController::class, 'activate'])->name('licenses.activate');
     Route::post('licenses/{license}/terminate', [LicenseController::class, 'terminate'])->name('licenses.terminate');
     Route::delete('licenses/{license}', [LicenseController::class, 'destroy'])->name('licenses.destroy');
+    Route::delete('licenses/{license}/activations/{activation}', [LicenseController::class, 'destroyActivation'])->name('licenses.activations.destroy');
 
     // Logs
     Route::get('logs', [LogController::class, 'index'])->name('logs.index');
