@@ -12,6 +12,16 @@ export default function ShowLicense({ license }) {
         pending: 'bg-blue-100 text-blue-800',
     };
 
+    const actionColors = {
+        activate: 'bg-green-100 text-green-800',
+        verify: 'bg-blue-100 text-blue-800',
+        deactivate: 'bg-yellow-100 text-yellow-800',
+        auto_expire: 'bg-red-100 text-red-800',
+        suspend: 'bg-orange-100 text-orange-800',
+        terminate: 'bg-gray-100 text-gray-800',
+        reactivate: 'bg-purple-100 text-purple-800',
+    };
+
     const platformLabels = {
         desktop: 'Desktop',
         hosting: 'Hosting',
