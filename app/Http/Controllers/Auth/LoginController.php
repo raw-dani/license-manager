@@ -21,7 +21,7 @@ class LoginController extends Controller
     {
         $credentials = $request->validate([
             'email' => ['required', 'email'],
-            'password' => ['required', 'string', 'min:8', 'regex:/[A-Z]/', 'regex:/[0-9]/', 'regex:/[^A-Za-z0-9]/'],
+            'password' => ['required', 'string'],
         ]);
 
         if (!Auth::attempt($credentials, $request->boolean('remember'))) {
