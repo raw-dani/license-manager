@@ -112,6 +112,16 @@ class LicenseClient
     }
 
     /**
+     * Lightweight status check for fast polling.
+     * Returns license status without requiring fingerprint verification.
+     * Use this to detect status changes (suspend/terminate/expire) quickly.
+     */
+    public function checkStatus(string $licenseKey): array
+    {
+        return $this->request('GET', '/api/v1/license/' . urlencode($licenseKey) . '/status');
+    }
+
+    /**
      * Check the license status.
      */
     public function status(string $licenseKey): array

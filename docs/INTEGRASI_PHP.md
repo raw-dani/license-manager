@@ -474,6 +474,154 @@ switch ($result['code']) {
 
 ---
 
+## Langkah 5b: Fast Status Polling (Real-time Enforcement)
+
+Untuk mendeteksi perubahan status lisensi (suspend/terminate/expire) lebih cepat tanpa menunggu verify cycle, gunakan **lightweight status polling**.
+
+### Konsep
+
+- Client melakukan polling ke endpoint `/api/v1/license/{key}/status` setiap 1-5 menit
+- Endpoint ini **tidak memerlukan fingerprint/device verification**, hanya API key + license key
+- Respons sangat ringan, hanya return status license + expires_at
+- Jika status berubah dari `active` → `suspended`/`terminated`/`expired`, client langsung lock aplikasi
+
+### Implementasi PHP Client
+
+```php
+class LicenseChecker
+{
+    private LicenseClient $client;
+    private string $licenseKey;
+    private string $lastKnownStatus = 'active';
+    
+    public function __construct()
+    {
+        $this->client = new LicenseClient(
+            serverUrl: $_ENV['LICENSE_SERVER_URL'],
+            apiKey: $_ENV['LICENSE_API_KEY']
+        );
+        $this->licenseKey = $_ENV['APP_LICENSE_KEY'];
+    }
+    
+    /**
+     * Fast status check - call this every 1-5 minutes via cron or background process.
+     * Returns immediately if status changed.
+     */
+    public function fastStatusCheck(): bool
+    {
+        $result = $this->client->checkStatus($this->licenseKey);
+        
+        if ($result['status'] !== 'success') {
+            // Server error - allow grace period or block based on policy
+            return true; // or false
+        }
+        
+        $currentStatus = $result['data']['status'];
+        
+        // If status changed from active, enforce lock
+        if ($this->lastKnownStatus === 'active' && $currentStatus !== 'active') {
+            $this->disableApplication();
+            $this->lastKnownStatus = $currentStatus;
+            return false;
+        }
+        
+        $this->lastKnownStatus = $currentStatus;
+        return true;
+    }
+    
+    /**
+     * Full verification - call this every verify_ttl_hours.
+     * Returns token for API requests.
+     */
+    public function verify(): array
+    {
+        // ... existing verify code
+    }
+    
+    private function disableApplication(): void
+    {
+        // Lock aplikasi: redirect, show notice, disable features, dll
+        // Simpan status ke file/database untuk persist across requests
+    }
+}
+```
+
+### Cron Setup untuk Fast Polling
+
+```bash
+# Cek status setiap 2 menit
+*/2 * * * * /usr/bin/php /path/to/your/app/check-license-status.php >> /var/log/license-status.log 2>&1
+```
+
+`check-license-status.php`:
+```php
+<?php
+require_once __DIR__ . '/vendor/autoload.php';
+
+$checker = new LicenseChecker();
+$isValid = $checker->fastStatusCheck();
+
+if (!$isValid) {
+    // Notify admin or log
+    error_log('License status changed - application locked');
+}
+```
+
+### Grace Period Strategy
+
+Jika server tidak dapat dihubungi (network issue), client bisa menerapkan grace period:
+
+```php
+public function fastStatusCheck(): bool
+{
+    try {
+        $result = $this->client->checkStatus($this->licenseKey);
+        
+        if ($result['status'] !== 'success') {
+            // Server error - check grace period
+            $graceUntil = $this->getGraceUntil();
+            
+            if (time() < $graceUntil) {
+                // Still in grace period, allow operation
+                return true;
+            }
+            
+            // Grace period expired, block
+            $this->disableApplication();
+            return false;
+        }
+        
+        // ... rest of logic
+    } catch (\Exception $e) {
+        // Connection error - apply grace period
+        return $this->isInGracePeriod();
+    }
+}
+```
+
+### Perbandingan: Verify vs Status Check
+
+| Feature | `verify` | `checkStatus` |
+|---------|----------|---------------|
+| **URL** | `POST /api/v1/verify` | `GET /api/v1/license/{key}/status` |
+| **Fingerprint** | Required | Not required |
+| **Device validation** | Yes | No |
+| **Token generation** | Yes | No |
+| **Rate limit** | 10 req/min | 30 req/min |
+| **Use case** | Full verification (every 24h) | Fast polling (every 1-5 min) |
+| **Payload size** | Large (returns token) | Small (status only) |
+
+### Rekomendasi Polling Interval
+
+| Environment | Interval | Reason |
+|-------------|----------|--------|
+| **Desktop app** | 5 minutes | User online, moderate polling OK |
+| **Hosting panel** | 2-3 minutes | Server always online, can poll more often |
+| **Mobile app** | 5-10 minutes | Battery/data conservation |
+| **High-security app** | 1 minute | Critical enforcement |
+
+---
+
 ## Langkah 6: Scheduler (Cron)
 
 Untuk verifikasi periodik, setup cron job di aplikasi PHP Anda:
