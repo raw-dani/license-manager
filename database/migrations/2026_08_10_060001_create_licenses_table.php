@@ -17,9 +17,9 @@ return new class extends Migration
             $table->enum('status', ['active', 'suspended', 'expired', 'terminated', 'pending'])->default('pending');
             $table->unsignedInteger('max_activations')->default(1);
             $table->unsignedInteger('current_activations')->default(0);
-            $table->timestamp('expires_at')->nullable();
-            $table->timestamp('activated_at')->nullable();
-            $table->timestamp('last_verified_at')->nullable();
+            $table->dateTime('expires_at')->nullable();
+            $table->dateTime('activated_at')->nullable();
+            $table->dateTime('last_verified_at')->nullable();
             $table->json('metadata')->nullable();
             $table->text('notes')->nullable();
             $table->timestamps();
