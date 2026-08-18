@@ -38,6 +38,7 @@ class LicenseStatusController extends Controller
                 'license_key' => $license->license_key,
                 'status' => $license->status,
                 'expires_at' => $license->expires_at?->toDateTimeString(),
+                'suspended_at' => $license->suspended_at?->toDateTimeString(),
                 'current_activations' => $license->current_activations,
                 'max_activations' => $license->max_activations,
                 'server_time' => now()->toDateTimeString(),

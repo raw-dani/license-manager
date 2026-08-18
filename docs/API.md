@@ -16,7 +16,67 @@ X-API-Key: YOUR_API_KEY
 
 API key dapat ditemukan di **Settings → API Key** pada admin panel.
 
-## Endpoints
+## Admin Endpoints (Remote Lock)
+
+Endpoint-admin ini memerlukan autentikasi **Sanctum token** dengan role `admin` atau `super-admin`. Gunakan untuk mengontrol lisensi dari jarak jauh (remote lock/unlock).
+
+```
+Authorization: Bearer SANCTUM_TOKEN
+```
+
+### Suspend License (Remote Lock)
+
+```
+POST /api/v1/admin/licenses/{license_key}/suspend
+```
+
+**Response (Success):**
+```json
+{
+  "status": "success",
+  "code": 200,
+  "message": "License suspended successfully",
+  "data": {
+    "license_key": "SP-XXXX-XXXX-XXXX",
+    "status": "suspended",
+    "suspended_at": "2026-08-18 15:00:00"
+  }
+}
+```
+
+**Error Responses:**
+- `401` - Unauthenticated (missing/invalid Sanctum token)
+- `403` - Forbidden (user bukan admin)
+- `404` - License not found
+- `409` - License is already suspended
+
+### Unsuspend License (Remote Unlock)
+
+```
+POST /api/v1/admin/licenses/{license_key}/unsuspend
+```
+
+**Response (Success):**
+```json
+{
+  "status": "success",
+  "code": 200,
+  "message": "License unsuspended successfully",
+  "data": {
+    "license_key": "SP-XXXX-XXXX-XXXX",
+    "status": "active",
+    "suspended_at": null
+  }
+}
+```
+
+**Error Responses:**
+- `401` - Unauthenticated
+- `403` - Forbidden (user bukan admin)
+- `404` - License not found
+- `409` - License is not suspended
+
+---
 
 ### 1. Ping (Health Check)
 
@@ -171,6 +231,7 @@ GET /api/v1/license/{license_key}
     "expires_at": "2026-12-31 23:59:59",
     "activated_at": "2026-08-10 10:00:00",
     "last_verified_at": "2026-08-10 10:00:00",
+    "suspended_at": null,
     "server_time": "2026-08-10 10:00:00"
   }
 }
@@ -243,8 +304,9 @@ val fingerprint = sha256("$androidId|$packageName")
 | Code | Description |
 |---|---|
 | 400 | Bad request / missing parameters |
-| 401 | Missing API key |
+| 401 | Missing API key / Unauthenticated (admin endpoints) |
 | 403 | Invalid API key / license not active / max activations |
 | 404 | License not found |
+| 409 | Conflict (license already suspended / not suspended) |
 | 422 | Validation failed |
 | 500 | Server error / API key not configured |

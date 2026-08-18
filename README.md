@@ -64,6 +64,11 @@ php artisan db:seed
 
 npm run build
 php artisan serve
+
+php artisan route:clear
+php artisan config:clear
+php artisan view:clear
+php artisan optimize:clear
 ```
 
 > Catatan: Untuk development dengan hot reload, jalankan `npm run dev` di terminal terpisah.
@@ -121,6 +126,38 @@ php artisan test
 ## Deployment
 
 Lihat dokumentasi lengkap di `docs/SETUP.md`.
+
+### Upgrade Aplikasi Live
+
+Untuk menambahkan fitur baru (misalnya remote suspend/unsuspend) ke aplikasi yang sudah berjalan di produksi:
+
+1. **Pull kode terbaru** ke server produksi (Git / SFTP).
+2. **Jalankan migrasi database:**
+   ```bash
+   php artisan migrate --force
+   ```
+3. **Clear cache Laravel:**
+   ```bash
+   php artisan config:clear
+   php artisan route:clear
+   php artisan view:clear
+   php artisan optimize:clear
+   ```
+4. **Rebuild frontend assets (jika ada perubahan UI):**
+   ```bash
+   npm install
+   npm run build
+   ```
+5. **Restart queue worker (jika menggunakan queue):**
+   ```bash
+   php artisan queue:restart
+   ```
+6. **Verifikasi fitur:**
+   - Pastikan admin panel menampilkan field baru (misalnya `Suspended At`).
+   - Test endpoint baru via API / cURL.
+   - Pastikan aplikasi client mulai merespon sesuai perubahan.
+
+> Catatan: Jika kamu menggunakan zero-downtime deployment (Laravel Forge / Envoyer), pastikan migrasi dijalankan di dalam script deployment.
 
 ## Dokumentasi
 

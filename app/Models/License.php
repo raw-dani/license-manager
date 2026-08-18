@@ -20,6 +20,7 @@ class License extends Model
         'expires_at',
         'activated_at',
         'last_verified_at',
+        'suspended_at',
         'metadata',
         'notes',
     ];
@@ -28,6 +29,7 @@ class License extends Model
         'expires_at' => 'datetime',
         'activated_at' => 'datetime',
         'last_verified_at' => 'datetime',
+        'suspended_at' => 'datetime',
         'metadata' => 'array',
     ];
 
@@ -56,6 +58,11 @@ class License extends Model
         return $this->status === 'active';
     }
 
+    public function isSuspended(): bool
+    {
+        return $this->status === 'suspended';
+    }
+
     public function isExpired(): bool
     {
         return $this->expires_at !== null && $this->expires_at->isPast();
@@ -63,6 +70,6 @@ class License extends Model
 
     public function canActivate(): bool
     {
-        return $this->isActive() && $this->current_activations < $this->max_activations;
+        return $this->isActive() && !$this->isSuspended() && $this->current_activations < $this->max_activations;
     }
 }

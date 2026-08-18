@@ -41,6 +41,7 @@ class LicenseController extends Controller
                 'expires_at' => $license->expires_at?->toDateTimeString(),
                 'activated_at' => $license->activated_at?->toDateTimeString(),
                 'last_verified_at' => $license->last_verified_at?->toDateTimeString(),
+                'suspended_at' => $license->suspended_at?->toDateTimeString(),
                 'server_time' => now()->toDateTimeString(),
             ],
         ]);

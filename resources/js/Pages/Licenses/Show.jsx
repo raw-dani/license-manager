@@ -166,6 +166,12 @@ export default function ShowLicense({ license }) {
                             <dt className="text-sm text-gray-500">Last Verified</dt>
                             <dd className="text-sm">{license.last_verified_at ? new Date(license.last_verified_at).toLocaleString() : '-'}</dd>
                         </div>
+                        {license.status === 'suspended' && (
+                            <div className="flex justify-between">
+                                <dt className="text-sm text-gray-500">Suspended At</dt>
+                                <dd className="text-sm text-red-600">{license.suspended_at ? new Date(license.suspended_at).toLocaleString() : '-'}</dd>
+                            </div>
+                        )}
                         {license.notes && (
                             <div>
                                 <dt className="text-sm text-gray-500 mb-1">Notes</dt>

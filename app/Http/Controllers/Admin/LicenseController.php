@@ -124,7 +124,10 @@ class LicenseController extends Controller
 
     public function suspend(License $license): RedirectResponse
     {
-        $license->update(['status' => 'suspended']);
+        $license->update([
+            'status' => 'suspended',
+            'suspended_at' => now(),
+        ]);
 
         ActivationLog::create([
             'license_id' => $license->id,
@@ -143,7 +146,10 @@ class LicenseController extends Controller
 
     public function activate(License $license): RedirectResponse
     {
-        $license->update(['status' => 'active']);
+        $license->update([
+            'status' => 'active',
+            'suspended_at' => null,
+        ]);
 
         ActivationLog::create([
             'license_id' => $license->id,

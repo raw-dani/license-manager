@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\License;
 use App\Models\Product;
 use App\Models\Setting;
+use App\Models\User;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -198,6 +199,110 @@ class LicenseActivationTest extends TestCase
                 'status' => 'error',
                 'code' => 403,
                 'message' => 'Max activations reached',
+            ]);
+    }
+
+    public function test_admin_can_suspend_license_via_api(): void
+    {
+        $license = $this->createLicense();
+        $admin = User::firstWhere('email', 'admin@example.com');
+        $token = $admin->createToken('test')->plainTextToken;
+
+        $response = $this->withHeader('Authorization', 'Bearer ' . $token)
+            ->postJson('/api/v1/admin/licenses/' . $license->license_key . '/suspend');
+
+        $response->assertStatus(200)
+            ->assertJson([
+                'status' => 'success',
+                'code' => 200,
+                'message' => 'License suspended successfully',
+            ])
+            ->assertJsonStructure([
+                'data' => [
+                    'license_key',
+                    'status',
+                    'suspended_at',
+                ],
+            ]);
+
+        $this->assertDatabaseHas('licenses', [
+            'id' => $license->id,
+            'status' => 'suspended',
+        ]);
+
+        $this->assertDatabaseHas('activation_logs', [
+            'license_id' => $license->id,
+            'action' => 'suspend',
+        ]);
+    }
+
+    public function test_admin_can_unsuspend_license_via_api(): void
+    {
+        $license = $this->createLicense(['status' => 'suspended', 'suspended_at' => now()]);
+        $admin = User::firstWhere('email', 'admin@example.com');
+        $token = $admin->createToken('test')->plainTextToken;
+
+        $response = $this->withHeader('Authorization', 'Bearer ' . $token)
+            ->postJson('/api/v1/admin/licenses/' . $license->license_key . '/unsuspend');
+
+        $response->assertStatus(200)
+            ->assertJson([
+                'status' => 'success',
+                'code' => 200,
+                'message' => 'License unsuspended successfully',
+            ]);
+
+        $this->assertDatabaseHas('licenses', [
+            'id' => $license->id,
+            'status' => 'active',
+            'suspended_at' => null,
+        ]);
+    }
+
+    public function test_non_admin_cannot_suspend_license_via_api(): void
+    {
+        $license = $this->createLicense();
+        $support = User::firstWhere('email', 'admin@example.com');
+        $support->assignRole('support');
+        $token = $support->createToken('test')->plainTextToken;
+
+        $response = $this->withHeader('Authorization', 'Bearer ' . $token)
+            ->postJson('/api/v1/admin/licenses/' . $license->license_key . '/suspend');
+
+        $response->assertStatus(422);
+    }
+
+    public function test_unauthenticated_cannot_suspend_license_via_api(): void
+    {
+        $license = $this->createLicense();
+
+        $response = $this->postJson('/api/v1/admin/licenses/' . $license->license_key . '/suspend');
+
+        $response->assertStatus(401);
+    }
+
+    public function test_status_endpoint_returns_suspended_at(): void
+    {
+        $license = $this->createLicense([
+            'status' => 'suspended',
+            'suspended_at' => now(),
+        ]);
+
+        $response = $this->withHeader('X-API-Key', $this->apiKey)
+            ->getJson('/api/v1/license/' . $license->license_key . '/status');
+
+        $response->assertStatus(200)
+            ->assertJson([
+                'status' => 'success',
+                'data' => [
+                    'license_key' => $license->license_key,
+                    'status' => 'suspended',
+                ],
+            ])
+            ->assertJsonStructure([
+                'data' => [
+                    'suspended_at',
+                ],
             ]);
     }
 }
