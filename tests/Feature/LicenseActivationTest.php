@@ -305,4 +305,65 @@ class LicenseActivationTest extends TestCase
                 ],
             ]);
     }
+
+    public function test_suspend_returns_webhook_sent_status(): void
+    {
+        $license = $this->createLicense([
+            'webhook_url' => 'https://ecatalog.test/api/license/callback',
+            'webhook_secret' => 'test-secret',
+        ]);
+        $admin = User::firstWhere('email', 'admin@example.com');
+        $token = $admin->createToken('test')->plainTextToken;
+
+        $response = $this->withHeader('Authorization', 'Bearer ' . $token)
+            ->postJson('/api/v1/admin/licenses/' . $license->license_key . '/suspend');
+
+        $response->assertStatus(200)
+            ->assertJsonStructure([
+                'data' => [
+                    'license_key',
+                    'status',
+                    'suspended_at',
+                    'webhook_sent',
+                ],
+            ]);
+    }
+
+    public function test_notify_endpoint_sends_webhook(): void
+    {
+        $license = $this->createLicense([
+            'webhook_url' => 'https://ecatalog.test/api/license/callback',
+            'webhook_secret' => 'test-secret',
+        ]);
+        $admin = User::firstWhere('email', 'admin@example.com');
+        $token = $admin->createToken('test')->plainTextToken;
+
+        $response = $this->withHeader('Authorization', 'Bearer ' . $token)
+            ->postJson('/api/v1/admin/licenses/' . $license->license_key . '/notify');
+
+        $response->assertStatus(200)
+            ->assertJsonStructure([
+                'data' => [
+                    'license_key',
+                    'event',
+                    'webhook_sent',
+                ],
+            ]);
+    }
+
+    public function test_notify_returns_error_when_webhook_not_configured(): void
+    {
+        $license = $this->createLicense();
+        $admin = User::firstWhere('email', 'admin@example.com');
+        $token = $admin->createToken('test')->plainTextToken;
+
+        $response = $this->withHeader('Authorization', 'Bearer ' . $token)
+            ->postJson('/api/v1/admin/licenses/' . $license->license_key . '/notify');
+
+        $response->assertStatus(422)
+            ->assertJson([
+                'status' => 'error',
+                'message' => 'Webhook URL or secret not configured for this license',
+            ]);
+    }
 }

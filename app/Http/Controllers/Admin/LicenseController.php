@@ -9,6 +9,7 @@ use App\Models\LicenseActivation;
 use App\Models\Product;
 use App\Notifications\LicenseStatusChanged;
 use App\Services\License\LicenseKeyGenerator;
+use App\Services\License\WebhookService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -18,6 +19,10 @@ use Inertia\Response;
 
 class LicenseController extends Controller
 {
+    public function __construct(
+        protected WebhookService $webhookService
+    ) {}
+
     public function index(Request $request): Response
     {
         $query = License::with('product');
@@ -112,6 +117,8 @@ class LicenseController extends Controller
             'status' => ['required', 'in:active,suspended,expired,terminated,pending'],
             'max_activations' => ['required', 'integer', 'min:1', 'max:100'],
             'expires_at' => ['nullable', 'date'],
+            'webhook_url' => ['nullable', 'url', 'max:500'],
+            'webhook_secret' => ['nullable', 'string', 'max:64'],
             'notes' => ['nullable', 'string'],
             'metadata' => ['nullable', 'array'],
         ]);
@@ -136,6 +143,8 @@ class LicenseController extends Controller
             'notes' => 'License suspended by admin',
         ]);
 
+        $this->webhookService->notifySuspension($license);
+
         if ($license->customer_email && !in_array(config('mail.default'), ['log', 'array'], true)) {
             Notification::route('mail', $license->customer_email)
                 ->notify(new LicenseStatusChanged($license, 'suspended'));
@@ -157,6 +166,8 @@ class LicenseController extends Controller
             'action' => 'reactivate',
             'notes' => 'License reactivated by admin',
         ]);
+
+        $this->webhookService->notifyReactivation($license);
 
         if ($license->customer_email && !in_array(config('mail.default'), ['log', 'array'], true)) {
             Notification::route('mail', $license->customer_email)

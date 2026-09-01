@@ -5,15 +5,16 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Models\ActivationLog;
 use App\Models\License;
+use App\Services\License\WebhookService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
 
 class AdminApiController extends Controller
 {
-    public function __construct()
-    {
+    public function __construct(
+        protected WebhookService $webhookService
+    ) {
         $this->middleware('auth:sanctum');
     }
 
@@ -51,6 +52,8 @@ class AdminApiController extends Controller
             'notes' => 'License suspended remotely via API by ' . ($request->user()?->email ?? 'unknown'),
         ]);
 
+        $webhookSent = $this->webhookService->notifySuspension($license);
+
         return response()->json([
             'status' => 'success',
             'code' => 200,
@@ -59,6 +62,7 @@ class AdminApiController extends Controller
                 'license_key' => $license->license_key,
                 'status' => $license->status,
                 'suspended_at' => $license->suspended_at?->toDateTimeString(),
+                'webhook_sent' => $webhookSent,
             ],
         ]);
     }
@@ -97,6 +101,8 @@ class AdminApiController extends Controller
             'notes' => 'License unsuspended remotely via API by ' . ($request->user()?->email ?? 'unknown'),
         ]);
 
+        $webhookSent = $this->webhookService->notifyReactivation($license);
+
         return response()->json([
             'status' => 'success',
             'code' => 200,
@@ -105,6 +111,49 @@ class AdminApiController extends Controller
                 'license_key' => $license->license_key,
                 'status' => $license->status,
                 'suspended_at' => null,
+                'webhook_sent' => $webhookSent,
+            ],
+        ]);
+    }
+
+    public function notify(Request $request, string $key): JsonResponse
+    {
+        $this->ensureAdmin($request);
+
+        $license = License::where('license_key', $key)->first();
+
+        if (!$license) {
+            return response()->json([
+                'status' => 'error',
+                'code' => 404,
+                'message' => 'License not found',
+            ], 404);
+        }
+
+        if (empty($license->webhook_url) || empty($license->webhook_secret)) {
+            return response()->json([
+                'status' => 'error',
+                'code' => 422,
+                'message' => 'Webhook URL or secret not configured for this license',
+            ], 422);
+        }
+
+        $event = $request->input('event', 'license.' . $license->status);
+
+        $webhookSent = match ($license->status) {
+            'suspended' => $this->webhookService->notifySuspension($license),
+            'active' => $this->webhookService->notifyReactivation($license),
+            default => false,
+        };
+
+        return response()->json([
+            'status' => $webhookSent ? 'success' : 'error',
+            'code' => $webhookSent ? 200 : 500,
+            'message' => $webhookSent ? 'Webhook notification sent' : 'Failed to send webhook notification',
+            'data' => [
+                'license_key' => $license->license_key,
+                'event' => $event,
+                'webhook_sent' => $webhookSent,
             ],
         ]);
     }

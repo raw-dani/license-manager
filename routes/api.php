@@ -23,5 +23,6 @@ Route::prefix('v1')->group(function () {
     Route::middleware(['auth:sanctum', 'throttle:30,1'])->group(function () {
         Route::post('/admin/licenses/{key}/suspend', [App\Http\Controllers\Api\V1\AdminApiController::class, 'suspend']);
         Route::post('/admin/licenses/{key}/unsuspend', [App\Http\Controllers\Api\V1\AdminApiController::class, 'unsuspend']);
+        Route::post('/admin/licenses/{key}/notify', [App\Http\Controllers\Api\V1\AdminApiController::class, 'notify']);
     });
 });

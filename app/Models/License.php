@@ -21,6 +21,8 @@ class License extends Model
         'activated_at',
         'last_verified_at',
         'suspended_at',
+        'webhook_url',
+        'webhook_secret',
         'metadata',
         'notes',
     ];
