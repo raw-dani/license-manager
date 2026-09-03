@@ -2,8 +2,8 @@ import Layout from '../Layout';
 import { Link, router, usePage } from '@inertiajs/react';
 import { useState } from 'react';
 
-export default function ShowLicense({ license }) {
-    const { flash, transfer_token, transfer_token_expires_at } = usePage().props;
+export default function ShowLicense({ license, transfer_token, transfer_token_expires_at }) {
+    const { flash } = usePage().props;
     const [showTransferModal, setShowTransferModal] = useState(false);
     const [showTokenModal, setShowTokenModal] = useState(!!transfer_token);
     const [ttlHours, setTtlHours] = useState(24);

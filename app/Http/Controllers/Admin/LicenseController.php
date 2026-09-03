@@ -239,7 +239,7 @@ class LicenseController extends Controller
         ]);
     }
 
-    public function transferToken(Request $request, License $license): RedirectResponse
+    public function transferToken(Request $request, License $license)
     {
         $request->validate([
             'ttl_hours' => ['nullable', 'integer', 'min:1', 'max:168'],
@@ -253,8 +253,18 @@ class LicenseController extends Controller
             return back()->with('error', $e->getMessage());
         }
 
-        return back()->with([
-            'success' => 'Transfer token generated. Berikan ke customer untuk pindah server.',
+        $license->load([
+            'product',
+            'activations',
+            'installations' => fn ($q) => $q->latest()->limit(10),
+            'logs' => fn ($q) => $q->latest()->limit(50),
+        ]);
+
+        return Inertia::render('Licenses/Show', [
+            'license' => $license,
+            'flash' => [
+                'success' => 'Transfer token generated. Berikan ke customer untuk pindah server.',
+            ],
             'transfer_token' => $token,
             'transfer_token_expires_at' => now()->addHours($ttlHours)->toDateTimeString(),
         ]);
