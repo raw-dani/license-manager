@@ -125,7 +125,7 @@ class LicenseController extends Controller
             'status' => ['required', 'in:active,suspended,expired,terminated,pending'],
             'max_activations' => ['required', 'integer', 'min:1', 'max:100'],
             'expires_at' => ['nullable', 'date'],
-            'webhook_url' => ['nullable', 'url', 'max:500'],
+            'webhook_url' => ['nullable', 'url', 'max:500', 'not_in:localhost,127.0.0.1,0.0.0.0'],
             'webhook_secret' => ['nullable', 'string', 'max:64'],
             'notes' => ['nullable', 'string'],
             'metadata' => ['nullable', 'array'],

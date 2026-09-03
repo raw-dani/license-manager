@@ -22,9 +22,13 @@ class License extends Model
         'last_verified_at',
         'suspended_at',
         'webhook_url',
-        'webhook_secret',
         'metadata',
         'notes',
+    ];
+
+    protected $guarded = [
+        'webhook_secret',
+        'id',
     ];
 
     protected $casts = [

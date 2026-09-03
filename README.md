@@ -15,6 +15,22 @@ Aplikasi manajemen lisensi berbasis web yang dibangun dengan **Laravel 11** dan 
 - Dokumentasi API & setup
 - Testing (PHPUnit)
 
+## Security
+
+- HMAC-SHA256 signing untuk token & webhook
+- Timing-safe comparison (`hash_equals`)
+- Sanctum token expiration 24 jam (configurable)
+- Session encryption enabled by default
+- CSRF protection, XSS headers, CSP, HSTS
+- Rate limiting di semua endpoint API
+- Webhook URL SSRF protection (blokir private IP)
+- Per-license domain/IP access control via metadata
+- Pessimistic locking untuk mencegah race condition
+- Transfer token hashed (SHA256) & one-time use
+- CORS eksplisit via `config/cors.php`
+
+Detail security audit ada di `docs/SECURITY.md`.
+
 ## Struktur Proyek
 
 ```

@@ -19,11 +19,15 @@ class LicenseInstallation extends Model
         'ip_address',
         'hostname',
         'server_info',
-        'transfer_token',
-        'transfer_token_expires_at',
         'bound_at',
         'last_verified_at',
         'is_active',
+    ];
+
+    protected $guarded = [
+        'transfer_token',
+        'transfer_token_expires_at',
+        'id',
     ];
 
     protected $casts = [

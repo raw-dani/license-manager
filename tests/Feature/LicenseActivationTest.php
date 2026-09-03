@@ -490,4 +490,57 @@ class LicenseActivationTest extends TestCase
             'is_active' => false,
         ]);
     }
+
+    public function test_transfer_token_invalidated_after_use(): void
+    {
+        $license = $this->createLicense();
+        $admin = User::firstWhere('email', 'admin@example.com');
+        $token = $admin->createToken('test')->plainTextToken;
+
+        $this->withHeader('X-API-Key', $this->apiKey)
+            ->postJson('/api/v1/verify', [
+                'license_key' => $license->license_key,
+                'fingerprint' => str_repeat('l', 128),
+                'platform' => 'hosting',
+                'device_info' => ['install_id' => 'server-1'],
+            ]);
+
+        $tokenResponse = $this->withHeader('Authorization', 'Bearer ' . $token)
+            ->postJson('/api/v1/admin/licenses/' . $license->license_key . '/transfer-token');
+        $transferToken = $tokenResponse->json('data.transfer_token');
+
+        $this->withHeader('X-API-Key', $this->apiKey)
+            ->postJson('/api/v1/bind', [
+                'license_key' => $license->license_key,
+                'install_id' => 'server-2',
+                'transfer_token' => $transferToken,
+                'platform' => 'hosting',
+                'fingerprint' => str_repeat('l', 128),
+            ])->assertStatus(200);
+
+        $reuseResponse = $this->withHeader('X-API-Key', $this->apiKey)
+            ->postJson('/api/v1/bind', [
+                'license_key' => $license->license_key,
+                'install_id' => 'server-3',
+                'transfer_token' => $transferToken,
+                'platform' => 'hosting',
+                'fingerprint' => str_repeat('l', 128),
+            ]);
+
+        $reuseResponse->assertStatus(403);
+    }
+
+    public function test_transfer_token_ttl_validation(): void
+    {
+        $license = $this->createLicense();
+        $admin = User::firstWhere('email', 'admin@example.com');
+        $token = $admin->createToken('test')->plainTextToken;
+
+        $response = $this->withHeader('Authorization', 'Bearer ' . $token)
+            ->postJson('/api/v1/admin/licenses/' . $license->license_key . '/transfer-token', [
+                'ttl_hours' => 9999,
+            ]);
+
+        $response->assertStatus(422);
+    }
 }

@@ -162,6 +162,10 @@ class AdminApiController extends Controller
     {
         $this->ensureAdmin($request);
 
+        $validated = $request->validate([
+            'ttl_hours' => ['nullable', 'integer', 'min:1', 'max:168'],
+        ]);
+
         $license = License::where('license_key', $key)->first();
 
         if (!$license) {
@@ -172,7 +176,7 @@ class AdminApiController extends Controller
             ], 404);
         }
 
-        $ttlHours = (int) $request->input('ttl_hours', 24);
+        $ttlHours = (int) ($validated['ttl_hours'] ?? 24);
 
         try {
             $token = app(\App\Services\License\LicenseService::class)->generateTransferToken($key, $ttlHours);

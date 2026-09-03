@@ -4,8 +4,8 @@ use Illuminate\Support\Facades\Route;
 
 // API v1 routes
 Route::prefix('v1')->group(function () {
-    // Public endpoints (no auth required)
-    Route::post('/ping', [App\Http\Controllers\Api\V1\PingController::class, 'ping']);
+    // Public endpoints (no auth required, but rate limited)
+    Route::middleware('throttle:60,1')->post('/ping', [App\Http\Controllers\Api\V1\PingController::class, 'ping']);
 
     // Lightweight status check (no fingerprint required, just API key)
     Route::middleware(['api.key', 'throttle:30,1'])->get('/license/{key}/status', [App\Http\Controllers\Api\V1\LicenseStatusController::class, 'status']);
@@ -21,7 +21,7 @@ Route::prefix('v1')->group(function () {
     });
 
     // Admin endpoints (protected by Sanctum token + admin role)
-    Route::middleware(['auth:sanctum', 'throttle:30,1'])->group(function () {
+    Route::middleware(['auth:sanctum', 'role.or:admin,super-admin', 'throttle:30,1'])->group(function () {
         Route::post('/admin/licenses/{key}/suspend', [App\Http\Controllers\Api\V1\AdminApiController::class, 'suspend']);
         Route::post('/admin/licenses/{key}/unsuspend', [App\Http\Controllers\Api\V1\AdminApiController::class, 'unsuspend']);
         Route::post('/admin/licenses/{key}/notify', [App\Http\Controllers\Api\V1\AdminApiController::class, 'notify']);

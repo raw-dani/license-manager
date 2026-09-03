@@ -14,6 +14,14 @@ class WebhookService
             return false;
         }
 
+        if (!$this->isSafeWebhookUrl($license->webhook_url)) {
+            Log::warning('Webhook URL blocked (SSRF protection)', [
+                'license_key' => $license->license_key,
+                'webhook_url' => $license->webhook_url,
+            ]);
+            return false;
+        }
+
         $payload = [
             'event' => 'license.suspended',
             'license_key' => $license->license_key,
@@ -59,6 +67,14 @@ class WebhookService
     public function notifyReactivation(License $license): bool
     {
         if (empty($license->webhook_url) || empty($license->webhook_secret)) {
+            return false;
+        }
+
+        if (!$this->isSafeWebhookUrl($license->webhook_url)) {
+            Log::warning('Webhook URL blocked (SSRF protection)', [
+                'license_key' => $license->license_key,
+                'webhook_url' => $license->webhook_url,
+            ]);
             return false;
         }
 
@@ -112,5 +128,45 @@ class WebhookService
         $json = json_encode($dataToSign, JSON_UNESCAPED_SLASHES);
 
         return hash_hmac('sha256', $json, $secret);
+    }
+
+    private function isSafeWebhookUrl(string $url): bool
+    {
+        $parsed = parse_url($url);
+
+        if (!$parsed || !in_array($parsed['scheme'] ?? '', ['http', 'https'])) {
+            return false;
+        }
+
+        $host = $parsed['host'] ?? '';
+
+        if (empty($host)) {
+            return false;
+        }
+
+        $blockedHosts = ['localhost', '0.0.0.0', '::1', '[::1]'];
+        if (in_array(strtolower($host), $blockedHosts, true)) {
+            return false;
+        }
+
+        if (filter_var($host, FILTER_VALIDATE_IP)) {
+            return $this->isPublicIp($host);
+        }
+
+        $ip = gethostbyname($host);
+        if ($ip === $host) {
+            return true;
+        }
+
+        return $this->isPublicIp($ip);
+    }
+
+    private function isPublicIp(string $ip): bool
+    {
+        return (bool) filter_var(
+            $ip,
+            FILTER_VALIDATE_IP,
+            FILTER_FLAG_IPV4 | FILTER_FLAG_IPV6 | FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE
+        );
     }
 }

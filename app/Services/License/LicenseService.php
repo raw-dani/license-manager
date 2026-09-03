@@ -27,6 +27,8 @@ class LicenseService
             throw new RuntimeException('License not found', 404);
         }
 
+        $this->verifyAccess($license, $deviceInfo);
+
         if ($license->status !== 'active') {
             $this->log($licenseKey, 'activate', $platform, $fingerprint, $deviceInfo, 'FAILED: License is ' . $license->status);
             throw new RuntimeException('License is ' . $license->status, 403);
@@ -38,36 +40,34 @@ class LicenseService
             throw new RuntimeException('License is expired', 403);
         }
 
-        // Check if this device is already activated
-        $existingActivation = LicenseActivation::where('license_id', $license->id)
-            ->where('fingerprint', $fingerprint)
-            ->first();
+        return DB::transaction(function () use ($license, $fingerprint, $platform, $deviceInfo, $domain, $ipAddress) {
+            $lockedLicense = License::where('id', $license->id)->lockForUpdate()->first();
 
-        if ($existingActivation) {
-            // Re-activate existing device
-            $existingActivation->update([
-                'status' => 'active',
-                'last_verified_at' => now(),
-                'device_info' => $deviceInfo,
-                'domain' => $domain,
-                'ip_address' => $ipAddress,
-            ]);
+            $existingActivation = LicenseActivation::where('license_id', $lockedLicense->id)
+                ->where('fingerprint', $fingerprint)
+                ->first();
 
-            $this->log($licenseKey, 'activate', $platform, $fingerprint, $deviceInfo, 'Device re-activated');
+            if ($existingActivation) {
+                $existingActivation->update([
+                    'status' => 'active',
+                    'last_verified_at' => now(),
+                    'device_info' => $deviceInfo,
+                    'domain' => $domain,
+                    'ip_address' => $ipAddress,
+                ]);
 
-            return $this->buildResponse($license, $fingerprint, $platform, $domain);
-        }
+                $this->log($lockedLicense->license_key, 'activate', $platform, $fingerprint, $deviceInfo, 'Device re-activated');
 
-        // Check if max activations reached
-        if ($license->current_activations >= $license->max_activations) {
-            $this->log($licenseKey, 'activate', $platform, $fingerprint, $deviceInfo, 'FAILED: Max activations reached');
-            throw new RuntimeException('Max activations reached', 403);
-        }
+                return $this->buildResponse($lockedLicense, $fingerprint, $platform, $domain);
+            }
 
-        // Create new activation
-        DB::transaction(function () use ($license, $fingerprint, $platform, $deviceInfo, $domain, $ipAddress) {
+            if ($lockedLicense->current_activations >= $lockedLicense->max_activations) {
+                $this->log($lockedLicense->license_key, 'activate', $platform, $fingerprint, $deviceInfo, 'FAILED: Max activations reached');
+                throw new RuntimeException('Max activations reached', 403);
+            }
+
             LicenseActivation::create([
-                'license_id' => $license->id,
+                'license_id' => $lockedLicense->id,
                 'fingerprint' => $fingerprint,
                 'platform' => $platform,
                 'device_info' => $deviceInfo,
@@ -77,16 +77,16 @@ class LicenseService
                 'last_verified_at' => now(),
             ]);
 
-            $license->increment('current_activations');
-            $license->update([
-                'activated_at' => $license->activated_at ?? now(),
+            $lockedLicense->increment('current_activations');
+            $lockedLicense->update([
+                'activated_at' => $lockedLicense->activated_at ?? now(),
                 'last_verified_at' => now(),
             ]);
+
+            $this->log($lockedLicense->license_key, 'activate', $platform, $fingerprint, $deviceInfo, 'SUCCESS');
+
+            return $this->buildResponse($lockedLicense, $fingerprint, $platform, $domain);
         });
-
-        $this->log($licenseKey, 'activate', $platform, $fingerprint, $deviceInfo, 'SUCCESS');
-
-        return $this->buildResponse($license, $fingerprint, $platform, $domain);
     }
 
     /**
@@ -100,6 +100,8 @@ class LicenseService
             $this->log($licenseKey, 'verify', $platform, $fingerprint, $deviceInfo, 'FAILED: License not found');
             throw new RuntimeException('License not found', 404);
         }
+
+        $this->verifyAccess($license, $deviceInfo);
 
         if ($license->status !== 'active') {
             $this->log($licenseKey, 'verify', $platform, $fingerprint, $deviceInfo, 'FAILED: License is ' . $license->status);
@@ -287,6 +289,8 @@ class LicenseService
             throw new RuntimeException('License not found', 404);
         }
 
+        $this->verifyAccess($license, $deviceInfo);
+
         if ($license->status !== 'active') {
             throw new RuntimeException('License is ' . $license->status, 403);
         }
@@ -301,7 +305,7 @@ class LicenseService
 
         if ($transferToken) {
             $tokenMatch = LicenseInstallation::where('license_id', $license->id)
-                ->where('transfer_token', $transferToken)
+                ->where('transfer_token', hash('sha256', $transferToken))
                 ->where('transfer_token_expires_at', '>', now())
                 ->first();
 
@@ -319,7 +323,7 @@ class LicenseService
                 $existing->update(['is_active' => false]);
             }
 
-            LicenseInstallation::create([
+            $newInstallation = LicenseInstallation::create([
                 'license_id' => $license->id,
                 'install_id' => $installId,
                 'fingerprint' => $deviceInfo['fingerprint'] ?? null,
@@ -331,6 +335,11 @@ class LicenseService
                 'bound_at' => now(),
                 'last_verified_at' => now(),
                 'is_active' => true,
+            ]);
+
+            $newInstallation->update([
+                'transfer_token' => null,
+                'transfer_token_expires_at' => null,
             ]);
         });
 
@@ -347,6 +356,66 @@ class LicenseService
      * Generate a transfer token. Admin uses this to authorize moving
      * a license from one server to another.
      */
+    private function verifyAccess(License $license, array $deviceInfo = []): void
+    {
+        $allowedDomain = $license->metadata['allowed_domain'] ?? null;
+        $allowedIp = $license->metadata['allowed_ip'] ?? null;
+
+        if (!$allowedDomain && !$allowedIp) {
+            return;
+        }
+
+        $requestDomain = request()->header('X-License-Domain') ?? ($deviceInfo['domain'] ?? null);
+        $requestIp = request()->ip();
+
+        if ($allowedDomain && $requestDomain) {
+            $allowedDomains = is_array($allowedDomain) ? $allowedDomain : [$allowedDomain];
+            $matched = false;
+            foreach ($allowedDomains as $domain) {
+                if (fnmatch($domain, $requestDomain) || $domain === $requestDomain) {
+                    $matched = true;
+                    break;
+                }
+            }
+            if (!$matched) {
+                $this->log($license->license_key, 'access_check', 'unknown', '', $deviceInfo, 'FAILED: Domain not allowed: ' . $requestDomain);
+                throw new RuntimeException('License not authorized for this domain', 403);
+            }
+        }
+
+        if ($allowedIp && $requestIp) {
+            $allowedIps = is_array($allowedIp) ? $allowedIp : [$allowedIp];
+            $matched = false;
+            foreach ($allowedIps as $ip) {
+                if ($ip === $requestIp || $this->ipInCidr($requestIp, $ip)) {
+                    $matched = true;
+                    break;
+                }
+            }
+            if (!$matched) {
+                $this->log($license->license_key, 'access_check', 'unknown', '', $deviceInfo, 'FAILED: IP not allowed: ' . $requestIp);
+                throw new RuntimeException('License not authorized for this IP', 403);
+            }
+        }
+    }
+
+    private function ipInCidr(string $ip, string $cidr): bool
+    {
+        if (strpos($cidr, '/') === false) {
+            return false;
+        }
+
+        [$subnet, $bits] = explode('/', $cidr);
+        $ipLong = ip2long($ip);
+        $subnetLong = ip2long($subnet);
+        if ($ipLong === false || $subnetLong === false) {
+            return false;
+        }
+
+        $mask = -1 << (32 - (int) $bits);
+        return ($ipLong & $mask) === ($subnetLong & $mask);
+    }
+
     public function generateTransferToken(string $licenseKey, int $ttlHours = 24): string
     {
         $license = License::where('license_key', $licenseKey)->first();
