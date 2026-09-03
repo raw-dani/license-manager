@@ -158,6 +158,45 @@ class AdminApiController extends Controller
         ]);
     }
 
+    public function transferToken(Request $request, string $key): JsonResponse
+    {
+        $this->ensureAdmin($request);
+
+        $license = License::where('license_key', $key)->first();
+
+        if (!$license) {
+            return response()->json([
+                'status' => 'error',
+                'code' => 404,
+                'message' => 'License not found',
+            ], 404);
+        }
+
+        $ttlHours = (int) $request->input('ttl_hours', 24);
+
+        try {
+            $token = app(\App\Services\License\LicenseService::class)->generateTransferToken($key, $ttlHours);
+
+            return response()->json([
+                'status' => 'success',
+                'code' => 200,
+                'message' => 'Transfer token generated',
+                'data' => [
+                    'license_key' => $key,
+                    'transfer_token' => $token,
+                    'expires_in_hours' => $ttlHours,
+                    'expires_at' => now()->addHours($ttlHours)->toDateTimeString(),
+                ],
+            ]);
+        } catch (\RuntimeException $e) {
+            return response()->json([
+                'status' => 'error',
+                'code' => $e->getCode() ?: 500,
+                'message' => $e->getMessage(),
+            ], $e->getCode() ?: 500);
+        }
+    }
+
     private function ensureAdmin(Request $request): void
     {
         $user = $request->user();

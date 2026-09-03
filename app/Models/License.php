@@ -45,6 +45,16 @@ class License extends Model
         return $this->hasMany(LicenseActivation::class);
     }
 
+    public function installations()
+    {
+        return $this->hasMany(LicenseInstallation::class);
+    }
+
+    public function activeInstallation()
+    {
+        return $this->hasOne(LicenseInstallation::class)->where('is_active', true);
+    }
+
     public function logs()
     {
         return $this->hasMany(ActivationLog::class);

@@ -16,6 +16,7 @@ Route::prefix('v1')->group(function () {
         Route::post('/verify', [App\Http\Controllers\Api\V1\VerifyController::class, 'verify']);
         Route::post('/deactivate', [App\Http\Controllers\Api\V1\DeactivateController::class, 'deactivate']);
         Route::post('/validate', [App\Http\Controllers\Api\V1\ValidateController::class, 'validate']);
+        Route::post('/bind', [App\Http\Controllers\Api\V1\BindController::class, 'bind']);
         Route::get('/license/{key}', [App\Http\Controllers\Api\V1\LicenseController::class, 'show']);
     });
 
@@ -24,5 +25,6 @@ Route::prefix('v1')->group(function () {
         Route::post('/admin/licenses/{key}/suspend', [App\Http\Controllers\Api\V1\AdminApiController::class, 'suspend']);
         Route::post('/admin/licenses/{key}/unsuspend', [App\Http\Controllers\Api\V1\AdminApiController::class, 'unsuspend']);
         Route::post('/admin/licenses/{key}/notify', [App\Http\Controllers\Api\V1\AdminApiController::class, 'notify']);
+        Route::post('/admin/licenses/{key}/transfer-token', [App\Http\Controllers\Api\V1\AdminApiController::class, 'transferToken']);
     });
 });

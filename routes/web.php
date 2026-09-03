@@ -30,6 +30,7 @@ Route::middleware(['auth', 'role.or:admin,super-admin'])->prefix('admin')->name(
     Route::post('licenses/{license}/suspend', [LicenseController::class, 'suspend'])->name('licenses.suspend');
     Route::post('licenses/{license}/activate', [LicenseController::class, 'activate'])->name('licenses.activate');
     Route::post('licenses/{license}/terminate', [LicenseController::class, 'terminate'])->name('licenses.terminate');
+    Route::post('licenses/{license}/transfer-token', [LicenseController::class, 'transferToken'])->name('licenses.transfer-token');
     Route::delete('licenses/{license}', [LicenseController::class, 'destroy'])->name('licenses.destroy');
     Route::delete('licenses/{license}/activations/{activation}', [LicenseController::class, 'destroyActivation'])->name('licenses.activations.destroy');
 

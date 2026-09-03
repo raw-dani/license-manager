@@ -6,9 +6,11 @@ use App\Http\Controllers\Controller;
 use App\Models\ActivationLog;
 use App\Models\License;
 use App\Models\LicenseActivation;
+use App\Models\LicenseInstallation;
 use App\Models\Product;
 use App\Notifications\LicenseStatusChanged;
 use App\Services\License\LicenseKeyGenerator;
+use App\Services\License\LicenseService;
 use App\Services\License\WebhookService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -20,7 +22,8 @@ use Inertia\Response;
 class LicenseController extends Controller
 {
     public function __construct(
-        protected WebhookService $webhookService
+        protected WebhookService $webhookService,
+        protected LicenseService $licenseService
     ) {}
 
     public function index(Request $request): Response
@@ -92,7 +95,12 @@ class LicenseController extends Controller
 
     public function show(License $license): Response
     {
-        $license->load(['product', 'activations', 'logs' => fn ($q) => $q->latest()->limit(50)]);
+        $license->load([
+            'product',
+            'activations',
+            'installations' => fn ($q) => $q->latest()->limit(10),
+            'logs' => fn ($q) => $q->latest()->limit(50),
+        ]);
 
         return Inertia::render('Licenses/Show', [
             'license' => $license,
@@ -228,6 +236,27 @@ class LicenseController extends Controller
     {
         return response()->json([
             'key' => LicenseKeyGenerator::generateUnique(),
+        ]);
+    }
+
+    public function transferToken(Request $request, License $license): RedirectResponse
+    {
+        $request->validate([
+            'ttl_hours' => ['nullable', 'integer', 'min:1', 'max:168'],
+        ]);
+
+        $ttlHours = (int) $request->input('ttl_hours', 24);
+
+        try {
+            $token = $this->licenseService->generateTransferToken($license->license_key, $ttlHours);
+        } catch (\RuntimeException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        return back()->with([
+            'success' => 'Transfer token generated. Berikan ke customer untuk pindah server.',
+            'transfer_token' => $token,
+            'transfer_token_expires_at' => now()->addHours($ttlHours)->toDateTimeString(),
         ]);
     }
 }

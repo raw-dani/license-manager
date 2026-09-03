@@ -83,6 +83,45 @@ Ini menjalankan secara otomatis:
 - `license:reminder` - peringatan kedaluwarsa
 - `activation:purge-stale` - membersihkan aktivasi yang tidak aktif
 
+### Monitoring & Verifikasi Cron
+
+Cron default membuang output ke `/dev/null`, sehingga sulit dipantau. Gunakan versi dengan logging:
+
+```cron
+* * * * * cd /home/license.gmteknologi.com/public_html && php artisan schedule:run >> /home/license.gmteknologi.com/storage/logs/cron.log 2>&1
+```
+
+**Cek crontab aktif:**
+```bash
+crontab -l
+```
+
+**Cek service cron berjalan:**
+```bash
+systemctl status cron
+```
+
+**Cek schedule yang terdaftar:**
+```bash
+cd /home/license.gmteknologi.com/public_html && php artisan schedule:list
+```
+
+**Test manual scheduler:**
+```bash
+cd /home/license.gmteknologi.com/public_html && php artisan schedule:run
+```
+
+**Monitor log real-time:**
+```bash
+tail -f /home/license.gmteknologi.com/logs/cron.log
+```
+
+**Verifikasi auto-expire berjalan:**
+1. Buat license test dengan `expires_at` di masa lalu.
+2. Tunggu 1-2 menit.
+3. Cek di database: `SELECT license_key, status FROM licenses WHERE expires_at < NOW();`
+4. Jika status berubah ke `expired`, scheduler bekerja dengan baik.
+
 ## Deployment (Production)
 
 ### Nginx

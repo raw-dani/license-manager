@@ -366,4 +366,128 @@ class LicenseActivationTest extends TestCase
                 'message' => 'Webhook URL or secret not configured for this license',
             ]);
     }
+
+    public function test_license_binds_to_first_installation(): void
+    {
+        $license = $this->createLicense();
+
+        $response = $this->withHeader('X-API-Key', $this->apiKey)
+            ->postJson('/api/v1/verify', [
+                'license_key' => $license->license_key,
+                'fingerprint' => str_repeat('h', 128),
+                'platform' => 'hosting',
+                'device_info' => [
+                    'install_id' => 'server-abc-123',
+                ],
+            ]);
+
+        $response->assertStatus(200);
+
+        $this->assertDatabaseHas('license_installations', [
+            'license_id' => $license->id,
+            'install_id' => 'server-abc-123',
+            'is_active' => true,
+        ]);
+    }
+
+    public function test_different_install_id_is_rejected(): void
+    {
+        $license = $this->createLicense();
+        $fingerprint = str_repeat('i', 128);
+
+        $this->withHeader('X-API-Key', $this->apiKey)
+            ->postJson('/api/v1/verify', [
+                'license_key' => $license->license_key,
+                'fingerprint' => $fingerprint,
+                'platform' => 'hosting',
+                'device_info' => ['install_id' => 'server-original'],
+            ]);
+
+        $response = $this->withHeader('X-API-Key', $this->apiKey)
+            ->postJson('/api/v1/verify', [
+                'license_key' => $license->license_key,
+                'fingerprint' => $fingerprint,
+                'platform' => 'hosting',
+                'device_info' => ['install_id' => 'server-stolen'],
+            ]);
+
+        $response->assertStatus(403)
+            ->assertJson([
+                'status' => 'error',
+                'code' => 403,
+            ]);
+    }
+
+    public function test_bind_without_transfer_token_fails_when_already_bound(): void
+    {
+        $license = $this->createLicense();
+
+        $this->withHeader('X-API-Key', $this->apiKey)
+            ->postJson('/api/v1/verify', [
+                'license_key' => $license->license_key,
+                'fingerprint' => str_repeat('j', 128),
+                'platform' => 'hosting',
+                'device_info' => ['install_id' => 'server-first'],
+            ]);
+
+        $response = $this->withHeader('X-API-Key', $this->apiKey)
+            ->postJson('/api/v1/bind', [
+                'license_key' => $license->license_key,
+                'install_id' => 'server-second',
+                'platform' => 'hosting',
+                'fingerprint' => str_repeat('j', 128),
+            ]);
+
+        $response->assertStatus(403);
+    }
+
+    public function test_bind_with_valid_transfer_token_succeeds(): void
+    {
+        $license = $this->createLicense();
+        $admin = User::firstWhere('email', 'admin@example.com');
+        $token = $admin->createToken('test')->plainTextToken;
+
+        $this->withHeader('X-API-Key', $this->apiKey)
+            ->postJson('/api/v1/verify', [
+                'license_key' => $license->license_key,
+                'fingerprint' => str_repeat('k', 128),
+                'platform' => 'hosting',
+                'device_info' => ['install_id' => 'server-old'],
+            ]);
+
+        $tokenResponse = $this->withHeader('Authorization', 'Bearer ' . $token)
+            ->postJson('/api/v1/admin/licenses/' . $license->license_key . '/transfer-token', [
+                'ttl_hours' => 24,
+            ]);
+
+        $tokenResponse->assertStatus(200);
+        $transferToken = $tokenResponse->json('data.transfer_token');
+
+        $response = $this->withHeader('X-API-Key', $this->apiKey)
+            ->postJson('/api/v1/bind', [
+                'license_key' => $license->license_key,
+                'install_id' => 'server-new',
+                'transfer_token' => $transferToken,
+                'platform' => 'hosting',
+                'fingerprint' => str_repeat('k', 128),
+            ]);
+
+        $response->assertStatus(200)
+            ->assertJson([
+                'status' => 'success',
+                'message' => 'License bound to this installation',
+            ]);
+
+        $this->assertDatabaseHas('license_installations', [
+            'license_id' => $license->id,
+            'install_id' => 'server-new',
+            'is_active' => true,
+        ]);
+
+        $this->assertDatabaseHas('license_installations', [
+            'license_id' => $license->id,
+            'install_id' => 'server-old',
+            'is_active' => false,
+        ]);
+    }
 }
