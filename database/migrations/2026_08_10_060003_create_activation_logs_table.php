@@ -12,8 +12,8 @@ return new class extends Migration
             $table->id();
             $table->foreignId('license_id')->nullable()->constrained()->nullOnDelete();
             $table->string('license_key', 64);
-            $table->enum('action', ['activate', 'verify', 'deactivate', 'auto_expire', 'suspend', 'terminate', 'reactivate']);
-            $table->enum('platform', ['desktop', 'hosting', 'server', 'android'])->nullable();
+            $table->enum('action', ['activate', 'verify', 'deactivate', 'auto_expire', 'suspend', 'terminate', 'reactivate', 'bind', 'transfer_token']);
+            $table->string('platform', 32)->nullable();
             $table->string('ip_address', 45)->nullable();
             $table->text('user_agent')->nullable();
             $table->string('fingerprint', 128)->nullable();
