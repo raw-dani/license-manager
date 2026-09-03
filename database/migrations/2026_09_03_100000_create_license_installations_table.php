@@ -10,8 +10,8 @@ return new class extends Migration
     {
         Schema::create('license_installations', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('license_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('license_activation_id')->nullable()->constrained()->nullOnDelete();
+            $table->unsignedBigInteger('license_id')->index();
+            $table->unsignedBigInteger('license_activation_id')->nullable()->index();
             $table->string('install_id', 128)->unique();
             $table->string('fingerprint', 128)->nullable();
             $table->string('platform', 32);
@@ -25,6 +25,11 @@ return new class extends Migration
             $table->dateTime('last_verified_at')->nullable();
             $table->boolean('is_active')->default(true);
             $table->timestamps();
+
+            $table->foreign('license_id')
+                ->references('id')
+                ->on('licenses')
+                ->cascadeOnDelete();
 
             $table->index(['license_id', 'is_active']);
             $table->index('transfer_token');
