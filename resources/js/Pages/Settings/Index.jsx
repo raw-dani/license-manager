@@ -146,6 +146,100 @@ export default function Settings({ settings }) {
                     </div>
                 </div>
 
+                {/* SDK Downloads & Integration */}
+                <div className="bg-white rounded-lg shadow p-6 lg:col-span-2">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4">
+                        <div>
+                            <h2 className="text-lg font-semibold text-gray-900">SDK & Library Proteksi Klien</h2>
+                            <p className="text-sm text-gray-500 mt-1">
+                                Unduh library siap tanam untuk mengunci aplikasi Anda (anti bajak, anti pindah folder/server paksa).
+                            </p>
+                        </div>
+                        <a
+                            href="/admin/settings/download-sdk/all-zip"
+                            className="mt-3 sm:mt-0 inline-flex items-center justify-center px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-md hover:bg-gray-800 transition"
+                        >
+                            📦 Download Semua SDK (.zip)
+                        </a>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+                        {/* PHP Guard (Rekomendasi Utama) */}
+                        <div className="border border-blue-200 bg-blue-50/50 rounded-lg p-4 flex flex-col justify-between">
+                            <div>
+                                <div className="flex items-center justify-between mb-2">
+                                    <span className="text-xs font-semibold uppercase px-2 py-0.5 bg-blue-100 text-blue-700 rounded">
+                                        Rekomendasi Utama
+                                    </span>
+                                    <span className="text-xs text-gray-500">PHP 8.0+</span>
+                                </div>
+                                <h3 className="font-semibold text-gray-900 mb-1">LicenseGuard (PHP)</h3>
+                                <p className="text-xs text-gray-600 mb-4">
+                                    Library pengunci otomatis dengan Lock Screen terintegrasi, anti kloning server/folder, dan grace period offline.
+                                </p>
+                            </div>
+                            <div className="space-y-2">
+                                <a
+                                    href="/admin/settings/download-sdk/php-guard"
+                                    className="block w-full text-center px-3 py-2 bg-blue-600 text-white rounded text-xs font-medium hover:bg-blue-700"
+                                >
+                                    ⬇️ Download LicenseGuard.php
+                                </a>
+                                <a
+                                    href="/admin/settings/download-sdk/php-zip"
+                                    className="block w-full text-center px-3 py-1.5 border border-blue-300 text-blue-700 rounded text-xs hover:bg-blue-100/50"
+                                >
+                                    Paket Lengkap PHP + Dokumen (.zip)
+                                </a>
+                            </div>
+                        </div>
+
+                        {/* Python Desktop SDK */}
+                        <div className="border border-gray-200 rounded-lg p-4 flex flex-col justify-between">
+                            <div>
+                                <div className="flex items-center justify-between mb-2">
+                                    <span className="text-xs font-semibold uppercase px-2 py-0.5 bg-gray-100 text-gray-700 rounded">
+                                        Desktop App
+                                    </span>
+                                    <span className="text-xs text-gray-500">Python 3.8+</span>
+                                </div>
+                                <h3 className="font-semibold text-gray-900 mb-1">Python SDK</h3>
+                                <p className="text-xs text-gray-600 mb-4">
+                                    Client library untuk aplikasi desktop (PyQt, Tkinter, CLI) dengan penguncian UUID mesin & CPU ID.
+                                </p>
+                            </div>
+                            <a
+                                href="/admin/settings/download-sdk/python-zip"
+                                className="block w-full text-center px-3 py-2 bg-gray-100 text-gray-800 rounded text-xs font-medium hover:bg-gray-200 border border-gray-300"
+                            >
+                                ⬇️ Download Python SDK (.zip)
+                            </a>
+                        </div>
+
+                        {/* Server / Bash Script */}
+                        <div className="border border-gray-200 rounded-lg p-4 flex flex-col justify-between">
+                            <div>
+                                <div className="flex items-center justify-between mb-2">
+                                    <span className="text-xs font-semibold uppercase px-2 py-0.5 bg-gray-100 text-gray-700 rounded">
+                                        Linux Daemon
+                                    </span>
+                                    <span className="text-xs text-gray-500">Bash / Cron</span>
+                                </div>
+                                <h3 className="font-semibold text-gray-900 mb-1">Server Bash Script</h3>
+                                <p className="text-xs text-gray-600 mb-4">
+                                    Script shell untuk validasi lisensi tingkat server/VPS Linux berbasis machine-id secara terjadwal.
+                                </p>
+                            </div>
+                            <a
+                                href="/admin/settings/download-sdk/bash"
+                                className="block w-full text-center px-3 py-2 bg-gray-100 text-gray-800 rounded text-xs font-medium hover:bg-gray-200 border border-gray-300"
+                            >
+                                ⬇️ Download license_check.sh
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
                 {/* WHMCS Bridge */}
                 <div className="bg-white rounded-lg shadow p-6 lg:col-span-2">
                     <h2 className="text-lg font-semibold mb-4">WHMCS Billing Bridge</h2>

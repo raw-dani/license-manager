@@ -56,6 +56,8 @@ class LicenseService
                     'ip_address' => $ipAddress,
                 ]);
 
+                $this->checkInstallationBinding($lockedLicense, $existingActivation, $fingerprint, $platform, $domain, $ipAddress, $deviceInfo);
+
                 $this->log($lockedLicense->license_key, 'activate', $platform, $fingerprint, $deviceInfo, 'Device re-activated');
 
                 return $this->buildResponse($lockedLicense, $fingerprint, $platform, $domain);
@@ -66,7 +68,7 @@ class LicenseService
                 throw new RuntimeException('Max activations reached', 403);
             }
 
-            LicenseActivation::create([
+            $activation = LicenseActivation::create([
                 'license_id' => $lockedLicense->id,
                 'fingerprint' => $fingerprint,
                 'platform' => $platform,
@@ -82,6 +84,8 @@ class LicenseService
                 'activated_at' => $lockedLicense->activated_at ?? now(),
                 'last_verified_at' => now(),
             ]);
+
+            $this->checkInstallationBinding($lockedLicense, $activation, $fingerprint, $platform, $domain, $ipAddress, $deviceInfo);
 
             $this->log($lockedLicense->license_key, 'activate', $platform, $fingerprint, $deviceInfo, 'SUCCESS');
 
@@ -164,6 +168,14 @@ class LicenseService
                 if ($license->current_activations > 0) {
                     $license->decrement('current_activations');
                 }
+
+                // Lepaskan juga instalasi aktif terkait fingerprint ini agar lisensi bisa dipindahkan/diaktifkan ulang secara sah
+                LicenseInstallation::where('license_id', $license->id)
+                    ->where(function ($query) use ($activation) {
+                        $query->where('license_activation_id', $activation->id)
+                              ->orWhere('fingerprint', $activation->fingerprint);
+                    })
+                    ->update(['is_active' => false]);
             });
         }
 

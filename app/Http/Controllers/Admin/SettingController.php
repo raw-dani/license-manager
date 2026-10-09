@@ -55,4 +55,103 @@ class SettingController extends Controller
 
         return back()->with('success', 'API key regenerated successfully.');
     }
+
+    /**
+     * Download file atau paket SDK
+     */
+    public function downloadSdk(string $type): mixed
+    {
+        $sdkBasePath = base_path('sdk');
+
+        switch ($type) {
+            case 'php-guard':
+                $file = $sdkBasePath . '/php-panel/src/LicenseGuard.php';
+                if (!file_exists($file)) {
+                    abort(404, 'File LicenseGuard.php tidak ditemukan.');
+                }
+                return response()->download($file, 'LicenseGuard.php', [
+                    'Content-Type' => 'application/x-php',
+                ]);
+
+            case 'php-client':
+                $file = $sdkBasePath . '/php-panel/src/LicenseClient.php';
+                if (!file_exists($file)) {
+                    abort(404, 'File LicenseClient.php tidak ditemukan.');
+                }
+                return response()->download($file, 'LicenseClient.php', [
+                    'Content-Type' => 'application/x-php',
+                ]);
+
+            case 'bash':
+                $file = $sdkBasePath . '/server/license_check.sh';
+                if (!file_exists($file)) {
+                    abort(404, 'File license_check.sh tidak ditemukan.');
+                }
+                return response()->download($file, 'license_check.sh', [
+                    'Content-Type' => 'text/x-shellscript',
+                ]);
+
+            case 'python-zip':
+            case 'php-zip':
+            case 'all-zip':
+                $zipFile = storage_path('app/temp_' . $type . '_' . time() . '.zip');
+                $zip = new \ZipArchive();
+
+                if ($zip->open($zipFile, \ZipArchive::CREATE | \ZipArchive::OVERWRITE) !== true) {
+                    abort(500, 'Gagal membuat file arsip zip.');
+                }
+
+                if ($type === 'php-zip') {
+                    $sourceDir = $sdkBasePath . '/php-panel';
+                    $this->addFolderToZip($zip, $sourceDir, 'php-sdk');
+                    $guide = base_path('docs/INTEGRATION_GUIDE.md');
+                    if (file_exists($guide)) {
+                        $zip->addFile($guide, 'php-sdk/INTEGRATION_GUIDE.md');
+                    }
+                } elseif ($type === 'python-zip') {
+                    $sourceDir = $sdkBasePath . '/python';
+                    $this->addFolderToZip($zip, $sourceDir, 'python-sdk');
+                } else {
+                    $this->addFolderToZip($zip, $sdkBasePath, 'license-sdk');
+                    $guide = base_path('docs/INTEGRATION_GUIDE.md');
+                    if (file_exists($guide)) {
+                        $zip->addFile($guide, 'license-sdk/INTEGRATION_GUIDE.md');
+                    }
+                }
+
+                $zip->close();
+
+                $filename = ($type === 'php-zip') ? 'license-php-sdk.zip' : (($type === 'python-zip') ? 'license-python-sdk.zip' : 'license-all-sdk.zip');
+
+                return response()->download($zipFile, $filename)->deleteFileAfterSend(true);
+
+            default:
+                abort(404, 'Jenis SDK tidak dikenali.');
+        }
+    }
+
+    private function addFolderToZip(\ZipArchive $zip, string $folder, string $zipPath = ''): void
+    {
+        if (!is_dir($folder)) {
+            return;
+        }
+
+        $files = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($folder, \RecursiveDirectoryIterator::SKIP_DOTS),
+            \RecursiveIteratorIterator::SELF_FIRST
+        );
+
+        foreach ($files as $file) {
+            $filePath = $file->getRealPath();
+            $relativePath = substr($filePath, strlen(realpath($folder)) + 1);
+            $relativePath = str_replace('\\', '/', $relativePath);
+            $targetPath = $zipPath ? ($zipPath . '/' . $relativePath) : $relativePath;
+
+            if ($file->isDir()) {
+                $zip->addEmptyDir($targetPath);
+            } elseif ($file->isFile()) {
+                $zip->addFile($filePath, $targetPath);
+            }
+        }
+    }
 }

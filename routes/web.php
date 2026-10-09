@@ -41,6 +41,7 @@ Route::middleware(['auth', 'role.or:admin,super-admin'])->prefix('admin')->name(
     Route::get('settings', [SettingController::class, 'index'])->name('settings.index');
     Route::put('settings', [SettingController::class, 'update'])->name('settings.update');
     Route::post('settings/regenerate-api-key', [SettingController::class, 'regenerateApiKey'])->name('settings.regenerate-api-key');
+    Route::get('settings/download-sdk/{type}', [SettingController::class, 'downloadSdk'])->name('settings.download-sdk');
 
     // Profile
     Route::get('profile/password', [ProfileController::class, 'password'])->name('profile.password');
