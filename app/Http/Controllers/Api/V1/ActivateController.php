@@ -58,11 +58,14 @@ class ActivateController extends Controller
                 'errors' => $e->errors(),
             ], 422);
         } catch (\RuntimeException $e) {
+            $rawCode = (int) $e->getCode();
+            $code = ($rawCode >= 100 && $rawCode <= 599) ? $rawCode : 500;
+
             return response()->json([
                 'status' => 'error',
-                'code' => $e->getCode() ?: 500,
+                'code' => $code,
                 'message' => $e->getMessage(),
-            ], $e->getCode() ?: 500);
+            ], $code);
         }
     }
 }

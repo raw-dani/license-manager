@@ -24,9 +24,14 @@ return Application::configure(basePath: dirname(__DIR__))
             SecurityHeaders::class,
         ]);
 
-        $middleware->api(prepend: [
-            \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
-        ]);
+        $middleware->api(
+            prepend: [
+                \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
+            ],
+            append: [
+                SecurityHeaders::class,
+            ]
+        );
 
         $middleware->alias([
             'api.key' => EnsureApiKeyIsValid::class,

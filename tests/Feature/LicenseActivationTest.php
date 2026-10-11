@@ -32,13 +32,21 @@ class LicenseActivationTest extends TestCase
             'status' => true,
         ]);
 
-        return License::create(array_merge([
+        $license = new License(array_merge([
             'license_key' => 'SP-' . strtoupper(bin2hex(random_bytes(3))),
             'product_id' => $product->id,
             'status' => 'active',
             'max_activations' => 2,
             'current_activations' => 0,
         ], $overrides));
+
+        if (isset($overrides['webhook_secret'])) {
+            $license->webhook_secret = $overrides['webhook_secret'];
+        }
+
+        $license->save();
+
+        return $license;
     }
 
     public function test_can_activate_a_license(): void
@@ -263,13 +271,13 @@ class LicenseActivationTest extends TestCase
     {
         $license = $this->createLicense();
         $support = User::firstWhere('email', 'admin@example.com');
-        $support->assignRole('support');
+        $support->syncRoles(['support']);
         $token = $support->createToken('test')->plainTextToken;
 
         $response = $this->withHeader('Authorization', 'Bearer ' . $token)
             ->postJson('/api/v1/admin/licenses/' . $license->license_key . '/suspend');
 
-        $response->assertStatus(422);
+        $response->assertStatus(403);
     }
 
     public function test_unauthenticated_cannot_suspend_license_via_api(): void
@@ -372,7 +380,7 @@ class LicenseActivationTest extends TestCase
         $license = $this->createLicense();
 
         $response = $this->withHeader('X-API-Key', $this->apiKey)
-            ->postJson('/api/v1/verify', [
+            ->postJson('/api/v1/activate', [
                 'license_key' => $license->license_key,
                 'fingerprint' => str_repeat('h', 128),
                 'platform' => 'hosting',
@@ -396,7 +404,7 @@ class LicenseActivationTest extends TestCase
         $fingerprint = str_repeat('i', 128);
 
         $this->withHeader('X-API-Key', $this->apiKey)
-            ->postJson('/api/v1/verify', [
+            ->postJson('/api/v1/activate', [
                 'license_key' => $license->license_key,
                 'fingerprint' => $fingerprint,
                 'platform' => 'hosting',
@@ -423,7 +431,7 @@ class LicenseActivationTest extends TestCase
         $license = $this->createLicense();
 
         $this->withHeader('X-API-Key', $this->apiKey)
-            ->postJson('/api/v1/verify', [
+            ->postJson('/api/v1/activate', [
                 'license_key' => $license->license_key,
                 'fingerprint' => str_repeat('j', 128),
                 'platform' => 'hosting',
@@ -448,7 +456,7 @@ class LicenseActivationTest extends TestCase
         $token = $admin->createToken('test')->plainTextToken;
 
         $this->withHeader('X-API-Key', $this->apiKey)
-            ->postJson('/api/v1/verify', [
+            ->postJson('/api/v1/activate', [
                 'license_key' => $license->license_key,
                 'fingerprint' => str_repeat('k', 128),
                 'platform' => 'hosting',
@@ -498,7 +506,7 @@ class LicenseActivationTest extends TestCase
         $token = $admin->createToken('test')->plainTextToken;
 
         $this->withHeader('X-API-Key', $this->apiKey)
-            ->postJson('/api/v1/verify', [
+            ->postJson('/api/v1/activate', [
                 'license_key' => $license->license_key,
                 'fingerprint' => str_repeat('l', 128),
                 'platform' => 'hosting',
@@ -542,5 +550,71 @@ class LicenseActivationTest extends TestCase
             ]);
 
         $response->assertStatus(422);
+    }
+
+    public function test_license_with_allowed_domain_requires_domain(): void
+    {
+        $license = $this->createLicense([
+            'metadata' => [
+                'allowed_domain' => 'clientapp.com',
+            ],
+        ]);
+
+        $response = $this->withHeader('X-API-Key', $this->apiKey)
+            ->postJson('/api/v1/activate', [
+                'license_key' => $license->license_key,
+                'fingerprint' => str_repeat('m', 128),
+                'platform' => 'hosting',
+            ]);
+
+        $response->assertStatus(403)
+            ->assertJson([
+                'status' => 'error',
+                'message' => 'Domain verification required for this license',
+            ]);
+    }
+
+    public function test_license_with_allowed_domain_accepts_valid_domain(): void
+    {
+        $license = $this->createLicense([
+            'metadata' => [
+                'allowed_domain' => 'clientapp.com',
+            ],
+        ]);
+
+        $response = $this->withHeader('X-API-Key', $this->apiKey)
+            ->withHeader('X-License-Domain', 'clientapp.com')
+            ->postJson('/api/v1/activate', [
+                'license_key' => $license->license_key,
+                'fingerprint' => str_repeat('n', 128),
+                'platform' => 'hosting',
+                'domain' => 'clientapp.com',
+            ]);
+
+        $response->assertStatus(200);
+    }
+
+    public function test_license_with_allowed_domain_rejects_wrong_domain(): void
+    {
+        $license = $this->createLicense([
+            'metadata' => [
+                'allowed_domain' => 'clientapp.com',
+            ],
+        ]);
+
+        $response = $this->withHeader('X-API-Key', $this->apiKey)
+            ->withHeader('X-License-Domain', 'evil.com')
+            ->postJson('/api/v1/activate', [
+                'license_key' => $license->license_key,
+                'fingerprint' => str_repeat('o', 128),
+                'platform' => 'hosting',
+                'domain' => 'evil.com',
+            ]);
+
+        $response->assertStatus(403)
+            ->assertJson([
+                'status' => 'error',
+                'message' => 'License not authorized for this domain',
+            ]);
     }
 }

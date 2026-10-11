@@ -330,9 +330,16 @@ class LicenseService
             throw new RuntimeException('Transfer token required to bind to a new server. Use POST /license/transfer-token to request one from admin.', 403);
         }
 
-        DB::transaction(function () use ($license, $installId, $deviceInfo, $existing) {
+        DB::transaction(function () use ($license, $installId, $deviceInfo, $existing, $tokenMatch) {
             if ($existing) {
                 $existing->update(['is_active' => false]);
+            }
+
+            if (isset($tokenMatch) && $tokenMatch) {
+                $tokenMatch->forceFill([
+                    'transfer_token' => null,
+                    'transfer_token_expires_at' => null,
+                ])->save();
             }
 
             $newInstallation = LicenseInstallation::create([
@@ -347,11 +354,6 @@ class LicenseService
                 'bound_at' => now(),
                 'last_verified_at' => now(),
                 'is_active' => true,
-            ]);
-
-            $newInstallation->update([
-                'transfer_token' => null,
-                'transfer_token_expires_at' => null,
             ]);
         });
 
@@ -380,7 +382,12 @@ class LicenseService
         $requestDomain = request()->header('X-License-Domain') ?? ($deviceInfo['domain'] ?? null);
         $requestIp = request()->ip();
 
-        if ($allowedDomain && $requestDomain) {
+        if ($allowedDomain) {
+            if (empty($requestDomain)) {
+                $this->log($license->license_key, 'verify', 'unknown', '', $deviceInfo, 'FAILED: Domain required but not provided');
+                throw new RuntimeException('Domain verification required for this license', 403);
+            }
+
             $allowedDomains = is_array($allowedDomain) ? $allowedDomain : [$allowedDomain];
             $matched = false;
             foreach ($allowedDomains as $domain) {
@@ -390,12 +397,17 @@ class LicenseService
                 }
             }
             if (!$matched) {
-                $this->log($license->license_key, 'access_check', 'unknown', '', $deviceInfo, 'FAILED: Domain not allowed: ' . $requestDomain);
+                $this->log($license->license_key, 'verify', 'unknown', '', $deviceInfo, 'FAILED: Domain not allowed: ' . $requestDomain);
                 throw new RuntimeException('License not authorized for this domain', 403);
             }
         }
 
-        if ($allowedIp && $requestIp) {
+        if ($allowedIp) {
+            if (empty($requestIp)) {
+                $this->log($license->license_key, 'verify', 'unknown', '', $deviceInfo, 'FAILED: IP required but not provided');
+                throw new RuntimeException('IP verification required for this license', 403);
+            }
+
             $allowedIps = is_array($allowedIp) ? $allowedIp : [$allowedIp];
             $matched = false;
             foreach ($allowedIps as $ip) {
@@ -405,7 +417,7 @@ class LicenseService
                 }
             }
             if (!$matched) {
-                $this->log($license->license_key, 'access_check', 'unknown', '', $deviceInfo, 'FAILED: IP not allowed: ' . $requestIp);
+                $this->log($license->license_key, 'verify', 'unknown', '', $deviceInfo, 'FAILED: IP not allowed: ' . $requestIp);
                 throw new RuntimeException('License not authorized for this IP', 403);
             }
         }
@@ -441,19 +453,21 @@ class LicenseService
         $existing = LicenseInstallation::where('license_id', $license->id)->first();
 
         if ($existing) {
-            $existing->update([
+            $existing->forceFill([
                 'transfer_token' => hash('sha256', $token),
                 'transfer_token_expires_at' => now()->addHours($ttlHours),
-            ]);
+            ])->save();
         } else {
-            LicenseInstallation::create([
+            $existing = new LicenseInstallation([
                 'license_id' => $license->id,
                 'install_id' => 'pending-transfer',
                 'platform' => 'unknown',
-                'transfer_token' => hash('sha256', $token),
-                'transfer_token_expires_at' => now()->addHours($ttlHours),
                 'is_active' => false,
             ]);
+            $existing->forceFill([
+                'transfer_token' => hash('sha256', $token),
+                'transfer_token_expires_at' => now()->addHours($ttlHours),
+            ])->save();
         }
 
         $this->log($licenseKey, 'transfer_token', 'admin', '', [], 'Transfer token generated (expires in ' . $ttlHours . 'h)');

@@ -33,7 +33,8 @@ class WebhookService
         $payload['signature'] = $this->generateSignature($payload, $license->webhook_secret);
 
         try {
-            $response = Http::timeout(10)
+            $response = Http::withoutRedirecting()
+                ->timeout(5)
                 ->withHeaders([
                     'Content-Type' => 'application/json',
                     'Accept' => 'application/json',
@@ -88,7 +89,8 @@ class WebhookService
         $payload['signature'] = $this->generateSignature($payload, $license->webhook_secret);
 
         try {
-            $response = Http::timeout(10)
+            $response = Http::withoutRedirecting()
+                ->timeout(5)
                 ->withHeaders([
                     'Content-Type' => 'application/json',
                     'Accept' => 'application/json',
@@ -134,7 +136,12 @@ class WebhookService
     {
         $parsed = parse_url($url);
 
-        if (!$parsed || !in_array($parsed['scheme'] ?? '', ['http', 'https'])) {
+        if (!$parsed || !in_array($parsed['scheme'] ?? '', ['http', 'https'], true)) {
+            return false;
+        }
+
+        $port = $parsed['port'] ?? null;
+        if ($port !== null && !in_array((int) $port, [80, 443, 8080, 8443], true)) {
             return false;
         }
 
@@ -144,7 +151,7 @@ class WebhookService
             return false;
         }
 
-        $blockedHosts = ['localhost', '0.0.0.0', '::1', '[::1]'];
+        $blockedHosts = ['localhost', '0.0.0.0', '::1', '[::1]', 'metadata.google.internal'];
         if (in_array(strtolower($host), $blockedHosts, true)) {
             return false;
         }
@@ -155,7 +162,7 @@ class WebhookService
 
         $ip = gethostbyname($host);
         if ($ip === $host) {
-            return true;
+            return app()->environment('testing', 'local');
         }
 
         return $this->isPublicIp($ip);
