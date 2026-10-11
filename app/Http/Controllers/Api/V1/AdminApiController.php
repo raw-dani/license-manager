@@ -14,9 +14,7 @@ class AdminApiController extends Controller
 {
     public function __construct(
         protected WebhookService $webhookService
-    ) {
-        $this->middleware('auth:sanctum');
-    }
+    ) {}
 
     public function suspend(Request $request, string $key): JsonResponse
     {
